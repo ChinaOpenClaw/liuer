@@ -67,7 +67,14 @@ def main() -> int:
     for mode, sha, path in entries:
         check = gh([f"repos/{REPO}/git/blobs/{sha}"])
         if check is None:
-            content = (root / path).read_bytes()
+            # 必须用 git 对象内容而非工作区文件：core.autocrlf 下工作区是 CRLF、
+            # 索引里是 LF，直接读写文件算出的 blob sha 与 git 的不一致，上传校验会失败。
+            res = subprocess.run(["git", "cat-file", "blob", sha],
+                                 capture_output=True, cwd=root)
+            content = res.stdout
+            if res.returncode != 0 or not content:
+                print(f"  读取对象失败 {path}", file=sys.stderr)
+                return 1
             b64 = base64.b64encode(content).decode()
             blob = gh(["-X", "POST", f"repos/{REPO}/git/blobs"],
                       input_data=json.dumps({"content": b64, "encoding": "base64"}))
