@@ -7,7 +7,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from dolos.persona import (  # noqa: E402
+from liuer.persona import (  # noqa: E402
     MODE_CYCLE,
     MODE_LABELS,
     ResponseMode,
@@ -16,7 +16,7 @@ from dolos.persona import (  # noqa: E402
     load_profile,
     discover_profiles,
 )
-from dolos.persona.strategy import Stage  # noqa: E402
+from liuer.persona.strategy import Stage  # noqa: E402
 
 PASS, FAIL = 0, 0
 
@@ -98,7 +98,7 @@ def main() -> int:
     eng = StrategyEngine()
     st7 = StrategyState(stage=Stage.HARVEST)
     m = st7.next_mode()
-    from dolos.persona import load_profile as lp
+    from liuer.persona import load_profile as lp
     prof = lp(ROOT / "profiles" / "mother-1966.yaml")
     person = prof.to_person()
     prompt = eng.build_prompt(person, st7, "把钱转到这个账户")

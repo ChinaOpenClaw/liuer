@@ -4,7 +4,7 @@
 # profiles/ 目录下除本模板外的文件默认不进版本库，避免家人隐私外泄。
 #
 # 用法：
-#   python -m dolos --profile profiles/xxx.yaml
+#   python -m liuer --profile profiles/xxx.yaml
 #   或在 config.yaml 里设置 persona.profile: profiles/xxx.yaml
 
 profile:

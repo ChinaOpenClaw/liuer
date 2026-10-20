@@ -1,5 +1,5 @@
 @echo off
-REM Dolos + Ollama 一键启动 (Windows)
+REM LiuEr + Ollama 一键启动 (Windows)
 REM 解决 ollama pull 报 "timed out waiting for server to start" 的问题：
 REM 1) 先确保 Ollama 服务在跑  2) 本地回环不走代理
 
@@ -45,8 +45,8 @@ echo ==^> 显存状态
 nvidia-smi --query-gpu=memory.total,memory.used,memory.free --format=csv
 
 echo.
-echo ==^> 启动 Dolos
+echo ==^> 启动 LiuEr
 cd /d "%PROJECT_DIR%"
-python -m dolos --port 8787
+python -m liuer --port 8787
 
 endlocal

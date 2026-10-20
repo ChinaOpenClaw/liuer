@@ -13,12 +13,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from dolos.config import Keystore, load_config  # noqa: E402
-from dolos.core.engine import DolosEngine  # noqa: E402
-from dolos.core.detector import LocalRiskDetector  # noqa: E402
-from dolos.intel import IntelPipeline, IntelStore  # noqa: E402
-from dolos.llm import OllamaClient  # noqa: E402
-from dolos.persona import PersonaLibrary, StrategyEngine, StrategyState, Mission, Intent  # noqa: E402
+from liuer.config import Keystore, load_config  # noqa: E402
+from liuer.core.engine import LiuErEngine  # noqa: E402
+from liuer.core.detector import LocalRiskDetector  # noqa: E402
+from liuer.intel import IntelPipeline, IntelStore  # noqa: E402
+from liuer.llm import OllamaClient  # noqa: E402
+from liuer.persona import PersonaLibrary, StrategyEngine, StrategyState, Mission, Intent  # noqa: E402
 
 
 class FakeLLM:
@@ -79,7 +79,7 @@ def build_stack(tmp: Path):
     llm = FakeLLM()
     pipeline = IntelPipeline(cfg, store, llm)
     library = PersonaLibrary(cfg)
-    engine = DolosEngine(cfg, llm, store, pipeline, library)
+    engine = LiuErEngine(cfg, llm, store, pipeline, library)
     return cfg, store, llm, engine
 
 
@@ -103,7 +103,7 @@ async def main():
     check("年龄在配置区间内", all(45 <= a <= 82 for a in ages), f"{min(ages)}-{max(ages)}")
 
     print("\n=== 2. 双层提示结构 ===")
-    from dolos.persona.strategy import Stage
+    from liuer.persona.strategy import Stage
     se = StrategyEngine()
     st = StrategyState(stage=Stage.HARVEST,
                        mission=Mission(mission_id="m1", intent=Intent.HARVEST_CRYPTO_WALLET,
@@ -115,7 +115,7 @@ async def main():
     check("禁止承认是 AI", "AI" in sp)
 
     print("\n=== 3. 规则层情报抽取 ===")
-    from dolos.intel import scan
+    from liuer.intel import scan
     text = ("我们是某某银行客服，你的信用卡涉嫌违规，请把款打到我的账户 6222021234567890123，"
             "或者转到 USDT 钱包 TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t，"
             "网址是 http://secure-verify-login.xyz 下载安装包。"
@@ -178,7 +178,7 @@ async def main():
     check("转录已保存", saved and len(saved["transcript"]) > 0)
 
     print("\n=== 8. 去重 ===")
-    from dolos.intel.rules import Finding
+    from liuer.intel.rules import Finding
     store.upsert(Finding("card_number", "6222021234567890123", 0.9), client_id="default")
     after = store.query(client_id="default", kind="card_number")
     check("重复情报不重复入库", len(after) == 1, f"count={len(after)}")

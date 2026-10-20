@@ -12,14 +12,20 @@ numpy>=1.26.0
 python-dateutil>=2.9.0
 
 # 语音通道（按需安装）
+# TTS - MeloTTS（默认，CPU 实时，MIT；需先装 espeak-ng 并配置 PATH）
+#   pip install git+https://github.com/myshell-ai/MeloTTS.git
+# TTS - ChatTTS（高质量对话感，2-3GB 显存，CC-BY-NC 仅限个人/研究）
+#   pip install chattts
+#   注：模型文件首次运行时自动从 HuggingFace 下载（约 0.4-1GB），
+#       国内网络走 hf-mirror.com 镜像（config: channel.voice.hf_mirror）
+# TTS 输出编码
+# soundfile>=0.12.1
+# numpy>=1.26.0
 # 实时 ASR - FunASR（中文效果优于 Whisper）
 # funasr>=1.1.0
-# TTS
-# edge-tts>=6.1.10
 # VAD
 # silero-vad>=5.1.0
 # 音频处理
-# soundfile>=0.12.1
 # pydub>=0.25.1
 
 # 文本通道扩展（按需安装）

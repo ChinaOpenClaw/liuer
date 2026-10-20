@@ -18,7 +18,7 @@
 
 ```bash
 # 用指定档案启动
-python -m dolos --profile profiles/你的档案.yaml
+python -m liuer --profile profiles/你的档案.yaml
 
 # 或在 config.yaml 里固定
 # persona:

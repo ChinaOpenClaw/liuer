@@ -1,4 +1,4 @@
-# Dolos 本地部署配置
+# LiuEr 本地部署配置
 # 所有外部依赖均在此声明，默认全部本地运行，无任何外部云服务调用。
 
 deployment:
@@ -55,7 +55,7 @@ persona:
     - tech_illiterate
 
 intel:
-  database: data/dolos.db
+  database: data/liuer.db
   # 情报推送延迟上限（毫秒），超过则异步推送
   push_timeout_ms: 3000
   # 抽取置信度阈值，低于此值不推送给客户，仅入库待复核
@@ -88,11 +88,16 @@ channel:
       # 兼容 whisper 系列：faster-whisper | whisper | funasr
       device: cpu
     tts:
-      provider: edge_tts
-      voice: zh-CN-XiaoxiaoNeural
-      rate: "-8%"
-      # 句级流式合成，句子缓冲长度
-      sentence_buffer: 1
+      # melo     : MeloTTS，CPU 实时，零显存，MIT 可商用（默认，推荐）
+      # chattts  : ChatTTS，2-3GB 显存，对话感最强，CC-BY-NC 仅限个人/研究
+      # mock     : 无真实合成，仅开发用
+      # 模型首次运行时自动从 HuggingFace 下载
+      provider: melo
+      device: auto            # auto | cuda | cpu
+      voice: zh-CN-XiaoxiaoNeural   # 仅 mock 用
+    # 国内镜像加速（模型下载走 hf-mirror.com）
+    hf_mirror: true
+    hf_endpoint: "https://hf-mirror.com"
     vad:
       provider: silero
       # 静音判定阈值（秒），超过则认为用户说完

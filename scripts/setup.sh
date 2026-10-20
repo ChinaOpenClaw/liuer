@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Dolos 一键启动
-# 用法: ./scripts/setup.sh  然后  python -m dolos
+# LiuEr 一键启动
+# 用法: ./scripts/setup.sh  然后  python -m liuer
 set -e
 cd "$(dirname "$0")/.."
 
@@ -27,7 +27,7 @@ echo "  1) 准备本地模型（首次需要，约 10GB）"
 echo "     ollama pull qwen2.5:14b-instruct"
 echo "     ollama pull qwen2.5:7b-instruct"
 echo "  2) 启动服务"
-echo "     python -m dolos"
+echo "     python -m liuer"
 echo "  3) 打开看板"
 echo "     http://127.0.0.1:8787"
 echo ""

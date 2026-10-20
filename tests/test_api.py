@@ -9,7 +9,7 @@ sys.path.insert(0, str(ROOT))
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from dolos.api import create_server  # noqa: E402
+from liuer.api import create_server  # noqa: E402
 
 PASS, FAIL = 0, 0
 
@@ -129,7 +129,7 @@ def main() -> int:
 
     print("\n=== 10. 看板 ===")
     r = client.get("/")
-    check("看板可访问", r.status_code == 200 and "Dolos" in r.text)
+    check("看板可访问", r.status_code == 200 and "LiuEr" in r.text)
 
     print(f"\n{'='*46}\n  通过 {PASS}  失败 {FAIL}\n{'='*46}")
     return 0 if FAIL == 0 else 1

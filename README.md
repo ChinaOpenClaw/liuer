@@ -1,4 +1,4 @@
-# Dolos
+# 六耳（LiuEr）
 
 本地部署的主动反诈骗智能体系统。中文优先、语音与文本双通道、模型推理全部走本地 Ollama。
 
@@ -6,7 +6,11 @@
 
 ## 关于名字与致谢
 
-Δόλος（Dolos）是希腊神话中「诡计」的化身，与「欺骗女神」Ἀπάτη（Apate）是配对概念。
+取自《西游记》中的**六耳猕猴**——与孙悟空形貌无二的拟声高手，观音、玉帝的照妖镜、谛听皆不能辨，唯如来识破。原著对他的判词是：
+
+> 善聆音，能察理，知前后，万物皆明。
+
+这十二个字就是这个系统的规格书：会听（情报提取）、能辨（话术识别）、知前后（会话状态记忆）、皆明（全局情报视图）。而「法不传六耳」这句老话，本身就带情报色彩。
 
 本项目是**独立实现的开源工具**，与任何同名或近名的商业公司没有隶属、授权或代码关系。架构上的关键思路——双层提示结构——来自麦考瑞大学公开发表的论文《Bot Wars Evolved》（2025-03），本项目按其公开描述做了独立实现。
 
@@ -14,7 +18,7 @@
 
 ## 它解决什么问题
 
-传统反诈都在提高受害者的警惕性，也就是把防守成本压在个人身上。Dolos 换了一个支点：不去教育用户，而是主动与诈骗方接触，在对方拿到收款基础设施信息的那一刻截断。
+传统反诈都在提高受害者的警惕性，也就是把防守成本压在个人身上。LiuEr 换了一个支点：不去教育用户，而是主动与诈骗方接触，在对方拿到收款基础设施信息的那一刻截断。
 
 核心 KPI 不是浪费了多少时间，而是套出了多少可封堵的情报：收款账号、加密钱包、钓鱼域名、被冒用的品牌。
 
@@ -26,7 +30,7 @@
       ▼
 ┌─────────────────────────────────────────┐
 │  交互层                                   │
-│  Dolos Voice  |  Dolos Text               │
+│  LiuEr Voice  |  LiuEr Text               │
 │  语音管道     |  短信 邮件 社交平台        │
 └─────────────────────────────────────────┘
       ▼
@@ -89,7 +93,7 @@
 `profiles/` 下放具体人物档案，用于「为家中易受骗的长辈建一个数字诱饵」的场景。
 
 ```bash
-python -m dolos --profile profiles/你的档案.yaml
+python -m liuer --profile profiles/你的档案.yaml
 ```
 
 档案字段直接对应上表各模态。**隐私优先：除 `template.yaml` 外，目录内所有 `*.yaml` 默认不进版本库**，详见 `profiles/README.md`。
@@ -116,7 +120,7 @@ ollama pull qwen2.5:14b-instruct
 ollama pull qwen2.5:7b-instruct
 
 # 启动
-python -m dolos
+python -m liuer
 ```
 
 打开 http://127.0.0.1:8787
@@ -159,7 +163,57 @@ python -m dolos
 
 - **VAD**：`silero`（推荐）或内置能量阈值
 - **ASR**：`funasr` / `faster-whisper` / `whisper`，中文优先 FunASR
-- **TTS**：`edge-tts` 或本地声学模型，按人格口音映射音色
+- **TTS**：HuggingFace 开源模型，见下表
+
+### 语音合成（HuggingFace 模型）
+
+按 8GB 显存（且本地 LLM 已占约 3GB）选型：
+
+| 引擎 | 显存 | 许可证 | 特点 |
+|---|---|---|---|
+| **MeloTTS**（默认） | 0（CPU 实时） | MIT 可商用 | 几百 MB，与 LLM 互不抢资源 |
+| **ChatTTS** | 2-3GB | **CC-BY-NC 非商用** | 对话感最强：自带语气词、停顿、笑声，最贴合老年人格 |
+
+CosyVoice2 需 6-8GB 显存，与 LLM 无法共存于 8GB 卡，未纳入。
+
+```bash
+# 默认方案（CPU）
+pip install git+https://github.com/myshell-ai/MeloTTS.git   # 需先装 espeak-ng
+pip install soundfile numpy
+
+# 高质量方案（GPU，个人/研究用途）
+pip install chattts
+```
+
+模型文件**首次运行时自动从 HuggingFace 下载**；国内网络默认走
+`hf-mirror.com` 镜像（`channel.voice.hf_mirror: true`）。
+
+配置：
+
+```yaml
+channel:
+  voice:
+    tts:
+      provider: melo      # melo | chattts | mock
+      device: auto        # auto | cuda | cpu
+    hf_mirror: true
+```
+
+试听接口（装好依赖后快速验证）：
+
+```bash
+curl -X POST http://127.0.0.1:8787/api/voice/tts \
+  -H "Content-Type: application/json" \
+  -d '{"text":"哎哟，这好事我可得记下来，您是哪个科室的同志啊？","mission":{"accent":"putonghua"}}'
+```
+
+返回 WAV（base64）。`engine` 字段显示实际使用的引擎；
+依赖未装时会降级为 MockTTS 并在 `is_mock` 中标记。
+
+口音→音色映射：MeloTTS 内置中文音色单一，以语速区分口音气质；
+ChatTTS 用确定性随机种子生成说话人向量（如东北 1966、粤语影响 2249）。
+
+诚实声明：合成质量未在 CI 中验证（模型需本机下载），接线与降级逻辑有测试覆盖（`tests/test_voice.py`）。
 
 端到端延迟的三个主要杠杆：VAD 静音阈值、流式生成、句级提前合成。
 
