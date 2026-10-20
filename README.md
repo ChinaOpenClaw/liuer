@@ -21,8 +21,8 @@
 传统反诈都在提高受害者的警惕性，也就是把防守成本压在个人身上。LiuEr 换了一个支点：不去教育用户，而是主动与诈骗方接触，在对方拿到收款基础设施信息的那一刻截断。
 
 核心 KPI 不是浪费了多少时间，而是套出了多少可封堵的情报：收款账号、加密钱包、钓鱼域名、被冒用的品牌。
-<img width="1574" height="926" alt="image" src="https://github.com/user-attachments/assets/0181588d-1edf-4f93-813c-ef9447551d30" />
 
+<img width="1574" height="926" alt="LiuEr 情报看板" src="https://github.com/user-attachments/assets/0181588d-1edf-4f93-813c-ef9447551d30" />
 
 ## 架构
 
