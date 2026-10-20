@@ -1,0 +1,120 @@
+# Dolos 本地部署配置
+# 所有外部依赖均在此声明，默认全部本地运行，无任何外部云服务调用。
+
+deployment:
+  # local | private_cloud | hybrid
+  mode: local
+  host: 127.0.0.1
+  port: 8787
+  # 纯离线模式：为 true 时禁止任何出网请求
+  offline: true
+
+llm:
+  provider: ollama
+  base_url: http://127.0.0.1:11434
+  # 针对 RTX 3060 Ti 8GB 调优（Ollama 自身据此算出 default_num_ctx=4096）。
+  # 注意：实机测得同时开着 QQLive、AweSun、easyclaw 时可用显存仅剩约 5.4GB。
+  #   - qwen3.5:4b  约 3.0GB  → 当前显存可用，默认选择
+  #   - qwen3.5:9b  约 6.5GB  → 需先关掉占显存的程序（见下方注释）才能全放显存
+  # 两个模型设为同一个，避免每轮换入换出（9B 加载约 7 秒）。
+  chat_model: qwen3.5:4b
+  extract_model: qwen3.5:4b
+  # 想换成 9B：先关掉 QQLive / AweSun / easyclaw 释放约 2.5GB 显存，
+  # 再把上面两行改为 qwen3.5:9b。可用 nvidia-smi 确认 free 是否大于 6.5GB。
+  # 上下文长度。直接决定 KV 缓存占用，是 8GB 卡能否全放显存的关键杠杆。
+  # 40 条历史消息约 2-3K token，4096 足够且留有余量。
+  num_ctx: 4096
+  # 模型常驻时长（秒）。-1 表示永不卸载，避免重复加载。
+  keep_alive: -1
+  temperature: 0.85
+  top_p: 0.9
+  max_context_messages: 40
+  request_timeout: 60
+  # 抽取阶段的超时（秒）。9B 模型生成 256 token 约需 5-8 秒。
+  extract_timeout: 12
+  # 单次会话最长轮数，超过则主动收尾
+  max_turns: 80
+  # 会话最长时长（秒），到达后策略引擎强制结束
+  max_session_seconds: 3600
+
+persona:
+  # 人格库目标规模。程序按需生成，不预先落盘
+  library_size: 2000
+  default_age_range: [45, 82]
+  locales: ["zh-CN"]
+  accent_presets: ["putonghua", "northeastern", "sichuan", "cantonese_influenced", "southwestern"]
+  # 常见易受骗画像，供情报策略参考
+  vulnerability_tags:
+    - lonely_elder
+    - low_digital_literacy
+    - pension_holder
+    - recent_bereavement
+    - health_anxiety
+    - financial_anxiety
+    - authority_deference
+    - tech_illiterate
+
+intel:
+  database: data/dolos.db
+  # 情报推送延迟上限（毫秒），超过则异步推送
+  push_timeout_ms: 3000
+  # 抽取置信度阈值，低于此值不推送给客户，仅入库待复核
+  min_confidence: 0.55
+  # 实时推送通道：console | webhook | file
+  push_channel: console
+  webhook_url: ""
+
+detect:
+  # 接入方风险评分阈值：分数 >= 该值的会话转交 agent
+  divert_threshold: 0.6
+  # 是否启用本地规则预筛
+  enable_rules: true
+
+channel:
+  voice:
+    enabled: true
+    # SIP 中继接入配置。留空则使用内置模拟通道
+    sip:
+      enabled: false
+      host: 0.0.0.0
+      port: 5060
+      realm: ""
+      username: ""
+      password: ""
+      transport: udp
+    asr:
+      provider: funasr
+      model: paraformer-zh
+      # 兼容 whisper 系列：faster-whisper | whisper | funasr
+      device: cpu
+    tts:
+      provider: edge_tts
+      voice: zh-CN-XiaoxiaoNeural
+      rate: "-8%"
+      # 句级流式合成，句子缓冲长度
+      sentence_buffer: 1
+    vad:
+      provider: silero
+      # 静音判定阈值（秒），超过则认为用户说完
+      silence_threshold: 0.55
+      min_speech_seconds: 0.25
+    # 端到端延迟目标（毫秒），仅用于监控告警
+    latency_budget_ms: 2500
+  text:
+    enabled: true
+    # simulated | web | whatsapp | telegram
+    adapter: web
+    honeypot_pool_size: 500
+    # 主动巡逻间隔（秒）
+    patrol_interval: 300
+
+security:
+  # 数据加密密钥，留空则自动生成并保存到 data/fernet.key
+  encryption_key: ""
+  keystore: data/fernet.key
+  # 是否录制并归档会话音频
+  record_audio: true
+  audio_dir: data/audio
+  retention_days: 30
+  # 合规声明：仅用于经授权的防御场景
+  authorized_use_only: true

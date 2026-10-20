@@ -1,0 +1,26 @@
+# 核心依赖（必装）
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+pydantic>=2.9.0
+pyyaml>=6.0
+httpx>=0.27.0
+aiosqlite>=0.20.0
+python-multipart>=0.0.12
+jinja2>=3.1.4
+cryptography>=43.0.0
+numpy>=1.26.0
+python-dateutil>=2.9.0
+
+# 语音通道（按需安装）
+# 实时 ASR - FunASR（中文效果优于 Whisper）
+# funasr>=1.1.0
+# TTS
+# edge-tts>=6.1.10
+# VAD
+# silero-vad>=5.1.0
+# 音频处理
+# soundfile>=0.12.1
+# pydub>=0.25.1
+
+# 文本通道扩展（按需安装）
+# playwright>=1.48.0
