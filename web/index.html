@@ -38,6 +38,13 @@ th{color:var(--muted);font-weight:400}
 .msg.scammer{background:var(--panel2);align-self:flex-start}
 .msg.agent{background:#1c3329;align-self:flex-end}
 .msg .who{font-size:10px;color:var(--muted);margin-bottom:3px}
+.msg.agent details.think{margin-top:6px}
+.msg.agent details.think summary{font-size:10px;color:var(--muted);cursor:pointer;list-style:none}
+.msg.agent details.think summary::-webkit-details-marker{display:none}
+.msg.agent details.think summary::before{content:'▸ ';}
+.msg.agent details.think[open] summary::before{content:'▾ ';}
+.msg.agent details.think .body{white-space:pre-wrap;font-size:11px;color:var(--muted);
+  border-left:2px solid var(--border);padding-left:8px;margin-top:5px;line-height:1.6}
 .row{display:flex;gap:8px;margin-top:8px}
 input{flex:1;background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:13px}
 button{background:var(--accent);border:none;border-radius:6px;padding:8px 16px;color:#0f1115;font-size:13px;cursor:pointer;font-weight:500}
@@ -76,6 +83,7 @@ code{font-family:ui-monospace,Consolas,monospace;font-size:11px;color:var(--acce
   </div>
   <div class="row" style="font-size:11px;color:var(--muted)">
     会话 ID：<code id="sid">-</code>　人格：<code id="persona">-</code>　阶段：<code id="stage">-</code>
+    　思考：<code id="thinkstate">-</code>
   </div>
 </div>
 
@@ -119,6 +127,8 @@ async function send(){
   if(!t)return;
   add('chat','scammer',t);
   document.getElementById('text').value='';
+  const ts=document.getElementById('thinkstate');
+  ts.textContent='思考中…';
   const mission={intent:document.getElementById('intent').value};
   try{
     const r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},
@@ -129,15 +139,25 @@ async function send(){
     if(d.persona){document.getElementById('persona').textContent=
       d.persona.name+' / '+d.persona.age+'岁 / '+d.persona.accent;}
     document.getElementById('stage').textContent=d.stage||'-';
-    if(d.reply)add('chat','agent',d.reply);
+    if(d.reply)add('chat','agent',d.reply,d.thinking,d.think_degraded);
+    ts.textContent=d.thinking?((d.think_mode||'brief')+(d.think_degraded?' · 已降级直出':' · 已思考'))
+                             :'未思考（off）';
     refresh();
-  }catch(e){add('chat','agent','[错误] '+e);}
+  }catch(e){add('chat','agent','[错误] '+e);ts.textContent='-';}
 }
 
-function add(box,who,text){
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>
+  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+
+function add(box,who,text,thinking,degraded){
   const el=document.createElement('div');
   el.className='msg '+who;
-  el.innerHTML='<div class="who">'+(who==='scammer'?'诈骗方':'Agent')+'</div>'+text;
+  let html='<div class="who">'+(who==='scammer'?'诈骗方':'Agent')+'</div>'+esc(text);
+  if(thinking){
+    html+='<details class="think"><summary>短期思考'+(degraded?'（降级）':'')+'</summary>'+
+          '<div class="body">'+esc(thinking)+'</div></details>';
+  }
+  el.innerHTML=html;
   document.getElementById(box).appendChild(el);
   document.getElementById(box).scrollTop=99999;
 }

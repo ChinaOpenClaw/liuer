@@ -35,6 +35,9 @@ class Turn:
     ts: float
     intel_count: int = 0
     stage: str = ""
+    thinking: str = ""         # 本轮的短期思考，仅审计/看板用，不发给对方
+    think_mode: str = ""       # brief | native | off
+    degraded: bool = False     # 思考是否降级（超时/失败）
 
 
 @dataclass
@@ -49,11 +52,22 @@ class Session:
     started_at: float = field(default_factory=time.time)
     ended_at: float | None = None
     status: str = "active"
+    last_thinking: str = ""        # 最近一轮的短期思考
+    last_think_mode: str = ""      # brief | native | off
+    last_think_degraded: bool = False
 
-    def add_turn(self, role: str, text: str, *, intel_count: int = 0) -> None:
+    def add_turn(self, role: str, text: str, *, intel_count: int = 0,
+                 thinking: str = "", think_mode: str = "",
+                 degraded: bool = False) -> None:
+        if role == "agent":
+            self.last_thinking = thinking
+            self.last_think_mode = think_mode
+            self.last_think_degraded = degraded
         self.turns.append(Turn(role=role, text=text, ts=time.time(),
                                 intel_count=intel_count,
-                                stage=self.strategy.stage.value))
+                                stage=self.strategy.stage.value,
+                                thinking=thinking, think_mode=think_mode,
+                                degraded=degraded))
 
 
 class LiuErEngine:
@@ -107,7 +121,9 @@ class LiuErEngine:
         session.strategy.should_terminate = True
         session.strategy.terminate_reason = reason or "会话结束"
         transcript = [{"role": t.role, "text": t.text, "ts": t.ts,
-                       "stage": t.stage, "intel": t.intel_count} for t in session.turns]
+                       "stage": t.stage, "intel": t.intel_count,
+                       "thinking": t.thinking, "think_mode": t.think_mode}
+                      for t in session.turns]
         self.store.update_session(
             session.session_id, status="ended", ended_at=session.ended_at,
             transcript=transcript, stage=session.strategy.stage.value,
@@ -174,19 +190,31 @@ class LiuErEngine:
             self.end_session(session, reason=reason)
             return ""
 
-        # 生成回应
+        # 生成回应：先短期思考，再产出正文。思考只进审计，绝不外发。
         messages = self._message_history(session)
+        thinking, think_mode, degraded = "", "", False
         try:
-            reply = await self.llm.chat(
-                messages, temperature=self.cfg.get("llm.temperature", 0.85),
-                max_tokens=160)
+            if hasattr(self.llm, "chat_detailed"):
+                res = await self.llm.chat_detailed(
+                    messages, temperature=self.cfg.get("llm.temperature", 0.85),
+                    max_tokens=160)
+                reply, thinking = res.text, res.thinking
+                think_mode, degraded = res.mode, res.degraded
+                if res.degraded:
+                    log.warning("短期思考降级 | 会话=%s | %s",
+                                session.session_id, res.note or "未知原因")
+            else:  # 兼容不带思考能力的 LLM 实现
+                reply = await self.llm.chat(
+                    messages, temperature=self.cfg.get("llm.temperature", 0.85),
+                    max_tokens=160)
         except Exception as exc:  # noqa: BLE001
             log.error("LLM 生成失败: %s", exc)
             reply = self._fallback_reply(session)
 
         reply = self._sanitize(reply)
         if reply:
-            session.add_turn("agent", reply)
+            session.add_turn("agent", reply, thinking=thinking,
+                             think_mode=think_mode, degraded=degraded)
             self.store.incr("agent_replies")
         self._persist(session)
         return reply
@@ -194,7 +222,9 @@ class LiuErEngine:
     def _persist(self, session: Session) -> None:
         """增量落库。让运行中的会话也能查到完整转录。"""
         transcript = [{"role": t.role, "text": t.text, "ts": t.ts,
-                       "stage": t.stage, "intel": t.intel_count} for t in session.turns]
+                       "stage": t.stage, "intel": t.intel_count,
+                       "thinking": t.thinking, "think_mode": t.think_mode}
+                      for t in session.turns]
         self.store.update_session(
             session.session_id,
             stage=session.strategy.stage.value,
@@ -222,6 +252,10 @@ class LiuErEngine:
         if not reply:
             return ""
         r = reply.strip()
+        # 思考注入万一被模型复述出来，整段删除——这等于暴露机器身份
+        r = re.sub(r"\[内心活动.*?\]", "", r, flags=re.DOTALL)
+        # 复述到第一个句读为止，后面的正常发言要保住
+        r = re.sub(r"^(内心活动|思考过程)\s*[:：][^\n。！？]*[。！？]?", "", r, flags=re.M)
         # 去掉 markdown 符号
         r = re.sub(r"[*_`#>~\[\]()]+\s*", "", r)
         # 去掉常见 AI 自称（模型偶尔会破功）
@@ -297,11 +331,32 @@ class LiuErEngine:
 
         messages = self._message_history(session)
         buf: list[str] = []
-        async for chunk in self.llm.chat_stream(messages, max_tokens=120):
-            buf.append(chunk)
-            yield chunk
+        thinking, degraded = "", False
+        if hasattr(self.llm, "chat_stream_events"):
+            async for ev in self.llm.chat_stream_events(messages, max_tokens=120):
+                kind = ev.get("type")
+                if kind == "content":
+                    chunk = ev.get("text", "")
+                    buf.append(chunk)
+                    yield chunk
+                elif kind == "thinking":
+                    thinking = ev.get("text", "")
+                elif kind == "thinking_delta":
+                    thinking += ev.get("text", "")
+                elif kind == "done":
+                    thinking = thinking or ev.get("thinking", "")
+                    degraded = bool(ev.get("degraded"))
+                    if degraded and ev.get("text"):
+                        buf.append(ev["text"])
+                        yield ev["text"]
+        else:  # 兼容不带思考能力的 LLM 实现
+            async for chunk in self.llm.chat_stream(messages, max_tokens=120):
+                buf.append(chunk)
+                yield chunk
 
         full = self._sanitize("".join(buf))
         if full:
-            session.add_turn("agent", full)
+            session.add_turn("agent", full, thinking=thinking,
+                             think_mode=getattr(self.llm, "think_mode", ""),
+                             degraded=degraded)
             self.store.incr("agent_replies")

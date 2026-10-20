@@ -66,6 +66,10 @@ def create_server(config_path: str | None = None,
             "stage": session.strategy.stage.value if session else None,
             "harvested": session.strategy.harvested if session else {},
             "intel_summary": session.intel_summary if session else {},
+            # 短期思考：仅供审计与看板展示，不参与发送
+            "thinking": session.last_thinking if session else "",
+            "think_mode": session.last_think_mode if session else "",
+            "think_degraded": session.last_think_degraded if session else False,
         }
 
     @api.post("/api/voice")
