@@ -94,6 +94,26 @@ class Person:
 
     # 背景叙述，直接进入提示词
     background: str
+
+    # ---- 扩展维度（供 12 模式轮询消费）----
+    # 语境：时代背景、文化语境、这一代人的共同经验
+    context_profile: str = ""
+    # 个人情况：家庭结构、健康、经济、社交状况
+    personal_situation: str = ""
+    # 反身性格：自我反思方式与元认知特征
+    reflexive_personality: str = ""
+    # 同理心表达方式
+    empathy_style: str = ""
+    # 安抚他人的方式
+    comfort_style: str = ""
+    # 耐心程度描述
+    patience_style: str = ""
+    # 讲理/较真的方式（诡辩模态用）
+    reasoning_style: str = ""
+    # 套话时的口吻（套话模态用）
+    elicit_style: str = ""
+    # 易感点：被哪些套路影响，供策略预判
+    susceptibility: list[str] = field(default_factory=list)
     # 虚构但自洽的生活细节，用于回答骗子探问
     life_details: dict[str, str] = field(default_factory=dict)
     # 会使用哪些 App（不一致本身就是破绽）
@@ -116,6 +136,7 @@ class Person:
         """第一层提示：构造身份。字段顺序固定，保证同一人格跨会话一致。"""
         apps = "、".join(self.apps) if self.apps else "只会接打电话和发短信"
         flaws = "\n".join(f"  - {f.expression}（触发场景：{f.trigger}）" for f in self.flaws)
+        dims = self.dimension_prompt()
         return f"""你现在扮演以下这个人，全程不得偏离身份：
 
 姓名：{self.name}
@@ -133,7 +154,28 @@ class Person:
 {flaws}
 
 背景补充细节（被追问时可引用）：
-{chr(10).join(f'  {k}：{v}' for k, v in self.life_details.items()) or '  无'}"""
+{chr(10).join(f'  {k}：{v}' for k, v in self.life_details.items()) or '  无'}
+{dims}"""
+
+    def dimension_prompt(self) -> str:
+        """扩展维度的提示片段。仅渲染非空字段，避免提示词灌水。"""
+        rows: list[str] = []
+        pairs = [
+            ("你这一代人的共同经验与语境", self.context_profile),
+            ("你的个人情况", self.personal_situation),
+            ("你的自我反思方式（会怀疑自己，而不是怀疑别人）", self.reflexive_personality),
+            ("你表达同理心的方式", self.empathy_style),
+            ("你关心别人的方式", self.comfort_style),
+            ("你的耐心表现", self.patience_style),
+            ("你讲道理、较真的方式", self.reasoning_style),
+            ("你想问清楚一件事时的口吻", self.elicit_style),
+        ]
+        for label, value in pairs:
+            if value:
+                rows.append(f"  {label}：{value}")
+        if self.susceptibility:
+            rows.append(f"  你容易被说动的点：{'、'.join(self.susceptibility)}")
+        return "\n".join(rows)
 
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)

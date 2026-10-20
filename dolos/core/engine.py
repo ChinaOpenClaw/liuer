@@ -22,6 +22,7 @@ from ..intel.extractor import IntelPipeline
 from ..llm.client import OllamaClient
 from ..persona.library import PersonaLibrary
 from ..persona.model import Person
+from ..persona.profile import PersonaProfile
 from ..persona.strategy import Mission, Stage, StrategyEngine, StrategyState
 
 log = logging.getLogger(__name__)
@@ -57,13 +58,16 @@ class Session:
 
 class DolosEngine:
     def __init__(self, config, llm: OllamaClient, store, pipeline: IntelPipeline,
-                 library: PersonaLibrary) -> None:
+                 library: PersonaLibrary, profile: PersonaProfile | None = None) -> None:
         self.cfg = config
         self.llm = llm
         self.store = store
         self.pipeline = pipeline
         self.library = library
         self.strategy_engine = StrategyEngine()
+        # 档案模式：固定使用档案人格，不再是随机分配
+        self.profile = profile
+        self.fixed_persona: Person | None = profile.to_person() if profile else None
 
         self.max_context = int(config.get("llm.max_context_messages", 40))
         self.max_turns = int(config.get("llm.max_turns", 80))
@@ -76,7 +80,8 @@ class DolosEngine:
 
     def start_session(self, *, channel: str, peer: str,
                       mission: Mission | None = None) -> Session:
-        persona = self.library.acquire(fresh=True)
+        # 档案模式下复用固定人格；否则从人格库随机分配
+        persona = self.fixed_persona or self.library.acquire(fresh=True)
         mission = mission or Mission(mission_id="default")
         strategy = StrategyState(stage=Stage.OPENER, mission=mission,
                                  started_at=time.time())
@@ -156,6 +161,9 @@ class DolosEngine:
 
         # 阶段推进 + 怀疑度评估（规则判定，不依赖模型）
         self._update_stage(session, text, result)
+
+        # 推进 12 模态轮询，本轮的行为模态在此确定
+        session.strategy.next_mode()
 
         # 终止判据
         should_stop, reason = self.strategy_engine.should_terminate(

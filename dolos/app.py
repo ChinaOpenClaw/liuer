@@ -15,7 +15,7 @@ from .config import Config, Keystore, RuntimePaths, load_config
 from .core import DolosEngine
 from .intel import IntelPipeline, IntelStore
 from .llm import OllamaClient
-from .persona import PersonaLibrary
+from .persona import PersonaLibrary, PersonaProfile, load_profile
 
 log = logging.getLogger(__name__)
 
@@ -32,14 +32,20 @@ class App:
     sim_channel: SimulatedTextChannel
     voice_channel: VoicePipeline
     honeypot: HoneypotPool
+    profile: PersonaProfile | None = None
 
     async def close(self) -> None:
         await self.llm.__aexit__(None, None, None)
 
 
-def build_app(config_path: str | None = None) -> App:
+def build_app(config_path: str | None = None,
+              profile_path: str | None = None) -> App:
     cfg = load_config(config_path)
     paths = RuntimePaths(cfg.root, raw=cfg.raw)
+
+    # 档案优先于配置项：命令行显式指定时覆盖 config.yaml
+    profile_path = profile_path or cfg.get("persona.profile")
+    profile = load_profile(profile_path) if profile_path else None
 
     keystore = Keystore.load_or_create(
         paths.ensure("security.keystore", "data/.keystore"),
@@ -49,7 +55,7 @@ def build_app(config_path: str | None = None) -> App:
     llm = OllamaClient(cfg)
     pipeline = IntelPipeline(cfg, store, llm)
     library = PersonaLibrary(cfg)
-    engine = DolosEngine(cfg, llm, store, pipeline, library)
+    engine = DolosEngine(cfg, llm, store, pipeline, library, profile)
 
     web_channel = WebTextChannel(engine, cfg)
     sim_channel = SimulatedTextChannel(engine, cfg)
@@ -58,7 +64,7 @@ def build_app(config_path: str | None = None) -> App:
 
     return App(cfg=cfg, llm=llm, store=store, pipeline=pipeline, library=library,
                engine=engine, web_channel=web_channel, sim_channel=sim_channel,
-               voice_channel=voice_channel, honeypot=honeypot)
+               voice_channel=voice_channel, honeypot=honeypot, profile=profile)
 
 
 async def startup(app: App) -> None:

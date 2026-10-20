@@ -36,8 +36,9 @@ class DetectRequest(BaseModel):
     caller_number: str = ""
 
 
-def create_server(config_path: str | None = None) -> FastAPI:
-    app_ctx: App = build_app(config_path)
+def create_server(config_path: str | None = None,
+                  profile_path: str | None = None) -> FastAPI:
+    app_ctx: App = build_app(config_path, profile_path=profile_path)
     detector = LocalRiskDetector()
     registry = MissionRegistry()
 
@@ -153,6 +154,35 @@ def create_server(config_path: str | None = None) -> FastAPI:
     async def persona_preview(count: int = 5):
         people = [p.to_dict() for p in app_ctx.library.stream(min(count, 20))]
         return {"count": len(people), "personas": people}
+
+    @api.get("/api/profile")
+    async def profile():
+        """当前生效的人格档案与模态轮询状态。"""
+        if not app_ctx.profile:
+            return {"loaded": False,
+                    "note": "未加载档案，使用人格库随机分配"}
+        p = app_ctx.profile
+        return {
+            "loaded": True,
+            "codename": p.codename,
+            "path": str(p.path),
+            "based_on_real_person": p.real_person,
+            "opener": p.opener,
+            "tactics_note": p.tactics_note,
+        }
+
+    @api.get("/api/modes")
+    async def modes():
+        """12 模态轮询序列与当前会话的推进情况。"""
+        from .persona import MODE_CYCLE, MODE_LABELS, mode_cycle_labels
+        sessions = []
+        for s in app_ctx.engine._sessions.values():
+            sessions.append(s.strategy.modes.to_dict())
+        return {
+            "cycle": mode_cycle_labels(),
+            "cycle_length": len(MODE_CYCLE),
+            "active_sessions": sessions[:10],
+        }
 
     @api.get("/api/honeypot")
     async def honeypot(limit: int = 10):

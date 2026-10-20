@@ -14,6 +14,14 @@ from enum import Enum
 from typing import Any
 
 from ..persona.model import Person
+from ..persona.modes import (
+    MODE_CYCLE,
+    MODE_INSTRUCTIONS,
+    MODE_LABELS,
+    ModeScheduler,
+    ResponseMode,
+    build_mode_prompt,
+)
 
 
 class Stage(str, Enum):
@@ -98,6 +106,24 @@ class StrategyState:
     should_terminate: bool = False
     terminate_reason: str = ""
 
+    # 12 模态轮询器
+    modes: ModeScheduler = field(default_factory=ModeScheduler)
+    # 本轮生效的模态
+    current_mode: ResponseMode | None = None
+
+    def next_mode(self) -> ResponseMode:
+        """推进到下一模态。对方起疑时自动收敛到柔性模态。"""
+        # 对方起疑 → 强制柔性，停止诡辩和套话
+        self.modes.force_soft = self.suspicion_level > 0.3
+        # 未进入收割阶段前不主动套话，避免过早暴露目的
+        if self.stage in (Stage.OPENER, Stage.CURIOUS):
+            self.modes.allowed = frozenset(
+                m for m in MODE_CYCLE if m != ResponseMode.ELICIT)
+        else:
+            self.modes.allowed = None
+        self.current_mode = self.modes.next()
+        return self.current_mode
+
     def advance(self) -> None:
         order = [Stage.OPENER, Stage.CURIOUS, Stage.ENGAGE,
                  Stage.DEEP_TRUST, Stage.HARVEST, Stage.DEFLECT, Stage.CLOSING]
@@ -131,6 +157,12 @@ class StrategyEngine:
     def build_prompt(self, persona: Person, state: StrategyState,
                      scammer_utterance: str = "") -> str:
         parts: list[str] = [self.BASE_RULES]
+
+        # 本轮模态：每轮切换，避免话术惯性
+        mode = state.current_mode or state.next_mode()
+        mode_text = build_mode_prompt(mode, persona.name)
+        if mode_text:
+            parts.append("\n" + mode_text)
 
         parts.append("\n【当前阶段】")
         parts.append(f"{state.stage.value} — {STAGE_BRIEF.get(state.stage, '')}")

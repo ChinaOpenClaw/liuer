@@ -16,6 +16,8 @@ def main() -> int:
     parser.add_argument("--host", default=None)
     parser.add_argument("--port", type=int, default=None)
     parser.add_argument("--reload", action="store_true", help="开发模式热重载")
+    parser.add_argument("--profile", default=None,
+                        help="人格档案路径，例如 profiles/mother-1966.yaml")
     parser.add_argument("--log-level", default="info")
     args = parser.parse_args()
 
@@ -36,7 +38,7 @@ def main() -> int:
                     port=port, reload=True, log_level=args.log_level)
         return 0
 
-    server = create_server(args.config)
+    server = create_server(args.config, profile_path=args.profile)
     uvicorn.run(server, host=host, port=port, log_level=args.log_level)
     return 0
 
