@@ -45,6 +45,12 @@ th{color:var(--muted);font-weight:400}
 .msg.agent details.think[open] summary::before{content:'▾ ';}
 .msg.agent details.think .body{white-space:pre-wrap;font-size:11px;color:var(--muted);
   border-left:2px solid var(--border);padding-left:8px;margin-top:5px;line-height:1.6}
+button.play{margin-top:7px;display:inline-block;background:transparent;border:1px solid var(--border);
+  color:var(--muted);font-size:11px;padding:3px 11px;border-radius:12px;cursor:pointer;font-weight:400}
+button.play:hover{border-color:var(--accent);color:var(--accent)}
+button.play:disabled{opacity:.55;cursor:default}
+.toggle{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);white-space:nowrap}
+.toggle input{accent-color:var(--accent)}
 .row{display:flex;gap:8px;margin-top:8px}
 input{flex:1;background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:13px}
 button{background:var(--accent);border:none;border-radius:6px;padding:8px 16px;color:#0f1115;font-size:13px;cursor:pointer;font-weight:500}
@@ -79,11 +85,12 @@ code{font-family:ui-monospace,Consolas,monospace;font-size:11px;color:var(--acce
       <option value="map_network">摸清团伙结构</option>
     </select>
     <input id="text" placeholder="输入诈骗方说的话，例如：您好，这里是公安局，您的账户涉嫌洗钱">
+    <label class="toggle"><input type="checkbox" id="autoVoice"> 自动朗读</label>
     <button onclick="send()">发送</button>
   </div>
   <div class="row" style="font-size:11px;color:var(--muted)">
     会话 ID：<code id="sid">-</code>　人格：<code id="persona">-</code>　阶段：<code id="stage">-</code>
-    　思考：<code id="thinkstate">-</code>
+    　思考：<code id="thinkstate">-</code>　语音：<code id="ttsState">-</code>
   </div>
 </div>
 
@@ -140,6 +147,7 @@ async function send(){
       d.persona.name+' / '+d.persona.age+'岁 / '+d.persona.accent;}
     document.getElementById('stage').textContent=d.stage||'-';
     if(d.reply)add('chat','agent',d.reply,d.thinking,d.think_degraded);
+    if(d.reply && document.getElementById('autoVoice').checked) speakText(d.reply,null);
     ts.textContent=d.thinking?((d.think_mode||'brief')+(d.think_degraded?' · 已降级直出':' · 已思考'))
                              :'未思考（off）';
     refresh();
@@ -149,6 +157,41 @@ async function send(){
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>
   ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 
+function escAttr(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>
+  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+const ttsCache=new Map();
+
+async function speakText(text,btn){
+  if(!text) return;
+  const orig=btn?btn.textContent:'';
+  if(btn){btn.disabled=true;btn.textContent='合成中…';}
+  try{
+    let b64=ttsCache.get(text);
+    if(!b64){
+      const r=await fetch('/api/voice/tts',{method:'POST',
+        headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});
+      const d=await r.json();
+      if(!r.ok) throw new Error(d.detail||('HTTP '+r.status));
+      if(d.is_mock){
+        if(btn){btn.textContent='无语音引擎';setTimeout(()=>{btn.disabled=false;btn.textContent=orig;},1800);}
+        return;
+      }
+      b64=d.audio_base64;
+      if(ttsCache.size>60) ttsCache.clear();
+      ttsCache.set(text,b64);
+    }
+    const audio=new Audio('data:audio/wav;base64,'+b64);
+    if(btn){btn.textContent='播放中';audio.onended=()=>{btn.disabled=false;btn.textContent=orig;};}
+    await audio.play();
+  }catch(e){
+    console.error(e);
+    if(btn){btn.textContent='失败';setTimeout(()=>{btn.disabled=false;btn.textContent=orig;},1800);}
+  }
+}
+
+function speak(btn){ speakText(btn.dataset.text,btn); }
+
 function add(box,who,text,thinking,degraded){
   const el=document.createElement('div');
   el.className='msg '+who;
@@ -156,6 +199,9 @@ function add(box,who,text,thinking,degraded){
   if(thinking){
     html+='<details class="think"><summary>短期思考'+(degraded?'（降级）':'')+'</summary>'+
           '<div class="body">'+esc(thinking)+'</div></details>';
+  }
+  if(who==='agent'&&text){
+    html+='<button class="play" data-text="'+escAttr(text)+'" onclick="speak(this)">▶ 朗读</button>';
   }
   el.innerHTML=html;
   document.getElementById(box).appendChild(el);
@@ -184,6 +230,9 @@ async function refresh(){
     cards[2].textContent=Math.round(m.sessions_ended||0);
     cards[3].textContent=Math.round(m.turns_processed||0);
     cards[4].innerHTML='<span class="dot '+(h.llm.ok?'ok':'bad')+'"></span>'+(h.llm.ok?'就绪':'未就绪');
+    const t=h.tts||{};
+    document.getElementById('ttsState').textContent =
+      t.engine ? (t.ready?t.engine.replace('Adapter',''):'Mock 无音频') : '-';
     bar('byKind',s.by_kind); bar('byBrand',s.by_brand);
     bar('byTactic',s.by_tactic); bar('byAxis',s.by_axis);
 

@@ -12,12 +12,19 @@ numpy>=1.26.0
 python-dateutil>=2.9.0
 
 # 语音通道（按需安装）
-# TTS - MeloTTS（默认，CPU 实时，MIT；需先装 espeak-ng 并配置 PATH）
-#   pip install git+https://github.com/myshell-ai/MeloTTS.git
+# TTS - Kokoro-82M 中文版（推荐主力：CPU 实时，Apache 2.0，权重约 330MB）
+#   pip install kokoro "misaki[zh]" soundfile
+#   权重目录（config: channel.voice.tts.kokoro_dir）需含：
+#     config.json / kokoro-v1_1-zh.pth / voices/zf_001.pt
+#   注意：pip 上的 kokoro 把仓库名写死为英文版，中文权重需手动放到上面目录；
+#         代码用 KModel(config=..., model=...) 显式加载，不走自动下载。
+# TTS - MeloTTS（CPU 实时，MIT；需先装 espeak-ng 并配置 PATH）
+#   pip install melotts        # 官方包在 Python 3.13 上会构建失败，见 README
 # TTS - ChatTTS（高质量对话感，2-3GB 显存，CC-BY-NC 仅限个人/研究）
 #   pip install chattts
 #   注：模型文件首次运行时自动从 HuggingFace 下载（约 0.4-1GB），
 #       国内网络走 hf-mirror.com 镜像（config: channel.voice.hf_mirror）
+#       权重缓存目录由 config: storage.hf_home 指定，默认不落系统盘
 # TTS 输出编码
 # soundfile>=0.12.1
 # numpy>=1.26.0

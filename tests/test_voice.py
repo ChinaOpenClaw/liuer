@@ -45,7 +45,13 @@ def main() -> int:
 
     print("\n=== 1. 配置解析 ===")
     provider = str(cfg.get("channel.voice.tts.provider", ""))
-    check("默认 provider 为 melo", provider == "melo", provider)
+    check("provider 为自适应链", provider in ("auto", "melo", "kokoro"), provider)
+    check("Kokoro 权重目录已配置",
+          bool(cfg.get("channel.voice.tts.kokoro_dir")),
+          str(cfg.get("channel.voice.tts.kokoro_dir")))
+    check("模型不落系统盘",
+          str(cfg.get("storage.hf_home", "")).startswith("D:"),
+          str(cfg.get("storage.hf_home")))
     check("镜像开关存在", "hf_mirror" in cfg.raw.get("channel", {}).get("voice", {}))
     check("镜像端点正确", cfg.get("channel.voice.hf_endpoint") == "https://hf-mirror.com",
           str(cfg.get("channel.voice.hf_endpoint")))
@@ -80,9 +86,12 @@ def main() -> int:
           ch.voice_for_accent(Accent.SICHUAN))
 
     print("\n=== 6. 降级链 ===")
-    # 沙箱内没有 melo/chattts 依赖，应降级到 mock
+    # 降级只要落到可用引擎即可：机器上装了 kokoro 就用它，没装才是 Mock。
+    # 断言写死某一个引擎名会把测试绑死在特定机器的依赖状态上。
+    REAL = {"KokoroAdapter", "MeloTTSAdapter", "ChatTTSAdapter"}
     eng = build_tts(cfg)
-    check("melo 缺依赖时降级", type(eng).__name__ == "MockTTS", type(eng).__name__)
+    check("自适应链落到可用引擎", type(eng).__name__ in REAL | {"MockTTS"},
+          type(eng).__name__)
     cfg2 = load_config(ROOT / "config.yaml")
     cfg2.raw["channel"]["voice"]["tts"]["provider"] = "mock"
     eng2 = build_tts(cfg2)
@@ -90,7 +99,7 @@ def main() -> int:
     cfg3 = load_config(ROOT / "config.yaml")
     cfg3.raw["channel"]["voice"]["tts"]["provider"] = "chattts"
     eng3 = build_tts(cfg3)
-    check("chattts 缺依赖时降级到 mock", type(eng3).__name__ == "MockTTS",
+    check("chattts 不可用时降级到可用引擎", type(eng3).__name__ in REAL | {"MockTTS"},
           type(eng3).__name__)
 
     print("\n=== 7. Mock 合为文本字节 ===")

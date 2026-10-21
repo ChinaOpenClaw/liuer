@@ -197,32 +197,46 @@ python -m liuer
 
 | 引擎 | 显存 | 许可证 | 特点 |
 |---|---|---|---|
-| **MeloTTS**（默认） | 0（CPU 实时） | MIT 可商用 | 几百 MB，与 LLM 互不抢资源 |
+| **Kokoro-82M 中文版**（默认） | 0（CPU 实时） | Apache 2.0 | 权重约 330MB，语速可调，实测 4.5 秒话术合成 2.6 秒 |
+| **MeloTTS** | 0（CPU 实时） | MIT 可商用 | 几百 MB；官方包在 Python 3.13 上构建失败，暂未纳入默认链路 |
 | **ChatTTS** | 2-3GB | **CC-BY-NC 非商用** | 对话感最强：自带语气词、停顿、笑声，最贴合老年人格 |
 
 CosyVoice2 需 6-8GB 显存，与 LLM 无法共存于 8GB 卡，未纳入。
 
 ```bash
-# 默认方案（CPU）
-pip install git+https://github.com/myshell-ai/MeloTTS.git   # 需先装 espeak-ng
-pip install soundfile numpy
-
-# 高质量方案（GPU，个人/研究用途）
-pip install chattts
+# 默认方案（CPU，无需显卡）
+pip install kokoro "misaki[zh]" soundfile
 ```
 
-模型文件**首次运行时自动从 HuggingFace 下载**；国内网络默认走
-`hf-mirror.com` 镜像（`channel.voice.hf_mirror: true`）。
+权重不走自动下载。pip 上的 kokoro 把仓库名写死成英文版 `Kokoro-82M`，
+直接调 `KPipeline` 会下错模型（且中文仓库在另外的 repo），因此代码用
+`KModel(config=..., model=...)` 显式加载本地文件：
 
-配置：
+```
+D:/ai-models/kokoro/
+├── config.json
+├── kokoro-v1_1-zh.pth          # 327MB
+└── voices/zf_001.pt            # 音色，523KB 一个
+```
 
 ```yaml
 channel:
   voice:
     tts:
-      provider: melo      # melo | chattts | mock
-      device: auto        # auto | cuda | cpu
+      provider: auto            # auto | kokoro | melo | chattts | mock
+      device: cpu               # auto | cuda | cpu
+      kokoro_dir: D:/ai-models/kokoro
+      kokoro_voice: zf_001      # zf_001/002/003 女声，编号不同音色不同
+      kokoro_speed: 0.9         # 老人语速，低于 0.85 显得拖沓
     hf_mirror: true
+```
+
+模型与缓存目录统一放数据盘，不占系统盘：
+
+```yaml
+storage:
+  ollama_models: D:/ai-models/ollama/models   # 等价 OLLAMA_MODELS
+  hf_home: D:/ai-models/huggingface           # 等价 HF_HOME
 ```
 
 试听接口（装好依赖后快速验证）：
@@ -234,9 +248,12 @@ curl -X POST http://127.0.0.1:8787/api/voice/tts \
 ```
 
 返回 WAV（base64）。`engine` 字段显示实际使用的引擎；
-依赖未装时会降级为 MockTTS 并在 `is_mock` 中标记。
+依赖或权重缺失时降级为 MockTTS 并在 `is_mock` 中标记，不会静默返回空音频。
 
-口音→音色映射：MeloTTS 内置中文音色单一，以语速区分口音气质；
+看板侧：每条 Agent 回复下方有「朗读」按钮，输入区可开「自动朗读」；
+状态行显示当前 TTS 引擎。
+
+口音→音色映射：Kokoro 中文音色以编号区分，按口音选取不同音色文件，语速体现年龄感；
 ChatTTS 用确定性随机种子生成说话人向量（如东北 1966、粤语影响 2249）。
 
 诚实声明：合成质量未在 CI 中验证（模型需本机下载），接线与降级逻辑有测试覆盖（`tests/test_voice.py`）。

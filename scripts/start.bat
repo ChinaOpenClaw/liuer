@@ -8,6 +8,14 @@ setlocal
 set OLLAMA_DIR=C:\Users\10099\AppData\Local\Programs\Ollama
 set PROJECT_DIR=%~dp0..
 
+REM 模型权重一律放数据盘：C 盘常年满，3GB 的模型会把系统拖死
+set OLLAMA_MODELS=D:\ai-models\ollama\models
+set HF_HOME=D:\ai-models\huggingface
+set HUGGINGFACE_HUB_CACHE=%HF_HOME%\hub
+set TRANSFORMERS_CACHE=%HF_HOME%\hub
+if not exist "%OLLAMA_MODELS%" mkdir "%OLLAMA_MODELS%"
+if not exist "%HF_HOME%" mkdir "%HF_HOME%"
+
 REM 本地回环不走代理，否则 CLI 连自己的 11434 端口也会被代理拦截
 set NO_PROXY=localhost,127.0.0.1,::1
 set no_proxy=localhost,127.0.0.1,::1

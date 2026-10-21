@@ -9,6 +9,14 @@ deployment:
   # 纯离线模式：为 true 时禁止任何出网请求
   offline: true
 
+# 模型与缓存一律放非系统盘。系统盘（C:）常年 100% 占用，
+# 大模型权重落到 C 盘会直接把系统拖死。
+storage:
+  # Ollama 模型目录（等价于 OLLAMA_MODELS 环境变量）
+  ollama_models: D:/ai-models/ollama/models
+  # HuggingFace 缓存根目录（等价于 HF_HOME）
+  hf_home: D:/ai-models/huggingface
+
 llm:
   provider: ollama
   base_url: http://127.0.0.1:11434
@@ -109,13 +117,21 @@ channel:
       # 兼容 whisper 系列：faster-whisper | whisper | funasr
       device: cpu
     tts:
-      # melo     : MeloTTS，CPU 实时，零显存，MIT 可商用（默认，推荐）
+      # auto     : 依次尝试 melo → kokoro → chattts，缺依赖自动降级（推荐）
+      # melo     : MeloTTS，CPU 实时，零显存，MIT 可商用
+      # kokoro   : Kokoro-82M 中文版，CPU 实时，权重约 330MB，Apache 2.0
       # chattts  : ChatTTS，2-3GB 显存，对话感最强，CC-BY-NC 仅限个人/研究
       # mock     : 无真实合成，仅开发用
-      # 模型首次运行时自动从 HuggingFace 下载
-      provider: melo
-      device: auto            # auto | cuda | cpu
+      # 模型首次运行时自动从 HuggingFace 下载（缓存目录见 storage.hf_home）
+      provider: auto
+      device: cpu             # auto | cuda | cpu
       voice: zh-CN-XiaoxiaoNeural   # 仅 mock 用
+      # Kokoro 中文音色：zf_001 / zf_002 / zf_003（女声，编号不同音色不同）
+      kokoro_voice: zf_001
+      # 老人语速：0.9 左右偏慢，低于 0.85 会显得拖沓
+      kokoro_speed: 0.9
+      # Kokoro 中文权重目录（config.json + kokoro-v1_1-zh.pth + voices/）
+      kokoro_dir: D:/ai-models/kokoro
     # 国内镜像加速（模型下载走 hf-mirror.com）
     hf_mirror: true
     hf_endpoint: "https://hf-mirror.com"

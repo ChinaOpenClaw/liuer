@@ -170,10 +170,16 @@ def create_server(config_path: str | None = None,
         llm_health = await app_ctx.llm.health()
         from .channel.voice import health_check
         voice_health = await health_check(app_ctx.cfg)
+        tts = getattr(app_ctx.voice_channel, "tts", None)
         return {
             "status": "ok",
             "llm": llm_health,
             "voice": voice_health,
+            # TTS 引擎状态：看板据此提示「能不能出声」
+            "tts": {
+                "engine": type(tts).__name__ if tts else "none",
+                "ready": bool(tts) and type(tts).__name__ != "MockTTS",
+            },
             "persona": app_ctx.library.stats(),
             "metrics": app_ctx.store.metrics(),
             "deployment": {
